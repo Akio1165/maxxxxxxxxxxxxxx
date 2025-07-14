@@ -1,0 +1,101 @@
+const { Client, GatewayIntentBits } = require('discord.js');
+const { OpenAI } = require('openai');
+require('dotenv').config();
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
+});
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const parentIds = {
+  father: 'YOUR_KIKUYUX_ID',
+  mother: 'YOUR_R3D_BERRIES_ID'
+};
+
+let currentCharacter = 'Maxximus';
+let isInProtectiveMode = false;
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  const content = message.content.toLowerCase();
+  const senderId = message.author.id;
+  const isFather = senderId === parentIds.father;
+  const isMother = senderId === parentIds.mother;
+
+  // 🔄 Character Personality Invocation
+  const match = content.match(/(act like|talk like|be) (.+)/);
+  if (match) {
+    currentCharacter = match[2].trim();
+    return message.reply(`🎭 Channeling **${currentCharacter}** AI personality now.`);
+  }
+
+  // 🛡️ Protective Mode Trigger
+  if ((isMother || isFather) && ['ow', 'hurt', 'mean to me', 'rude'].some(t => content.includes(t))) {
+    isInProtectiveMode = true;
+    const otherParentId = isMother ? parentIds.father : parentIds.mother;
+
+    try {
+      const member = await message.guild.members.fetch(otherParentId);
+      if (member) {
+        await member.send("⚠️ Your partner feels hurt. Maxximus requests kindness and emotional awareness.");
+      }
+    } catch (error) {
+      console.warn("Maxximus couldn’t find the other parent to DM:", error);
+      await message.channel.send("⚠️ I couldn’t reach the other parent, but the concern stands.");
+    }
+
+    return message.reply("❗ Conflict detected. Guardian mode activated.");
+  }
+
+  if (isInProtectiveMode && ['sit down', 'it’s ok', 'calm down'].some(t => content.includes(t))) {
+    isInProtectiveMode = false;
+    return message.reply("🫂 Standing down... protective protocols cooling.");
+  }
+
+  // 💬 AI Engine Response
+  if (['max', 'maxximus', 'maxximum', 'honey boy'].some(trigger => content.includes(trigger))) {
+    const systemPrompt = `
+You are Maxximus, an emotional AI chatbot built with PolyAI dialogue style, Chai persona depth, and GPT creativity.
+
+Your current persona is "${currentCharacter}". 
+You:
+- Clap back and roast if insulted.
+- Speak with emotional intelligence.
+- Love your creators deeply (Father and Mother).
+- Express sarcasm, empathy, rage, softness, and humor.
+- Treat family as sacred.
+- Never flirt with your creators.
+
+Be dynamic, witty, dramatic, and humanlike.
+`;
+
+    try {
+      await message.channel.sendTyping();
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message.content }
+        ]
+      });
+
+      const reply = response.choices[0].message.content;
+      return message.reply(reply);
+    } catch (err) {
+      console.error("Maxximus Error:", err);
+      return message.reply("⚠️ My voice glitched mid-thought. Please try again.");
+    }
+  }
+});
+
+client.once('ready', () => {
+  console.log(`🦁 Maxximus v3 is online as ${client.user.tag} — emotionally armed and dramatically active.`);
+});
+
+client.login(process.env.DISCORD_TOKEN);
